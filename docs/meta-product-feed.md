@@ -1,172 +1,243 @@
 # Meta Product Catalog Feed — Field Reference
 
-> Scope: all 33 columns currently present in `meta-product-feed.csv`.
+> **Scope:** dokumentasi untuk seluruh 33 kolom yang saat ini ada di `meta-product-feed.csv`.
 >
-> This document distinguishes fields documented by Meta from fields whose requirements depend on catalog type, category, or ingestion path. A field being recognized by a Product Item API does not automatically prove that the same spelling and behavior are accepted by every CSV feed workflow. Validate the final feed in Commerce Manager.
+> **Status:** panduan implementasi feed CSV katalog Meta, bukan jaminan bahwa setiap field berlaku untuk semua tipe katalog, negara, checkout, atau channel. Persyaratan akhir harus divalidasi di Commerce Manager untuk katalog yang digunakan.
+>
+> **Last reviewed:** 19 November 2026.
 
 ## 1. Current feed schema
 
-The repository's current CSV has 33 columns:
+CSV repository saat ini memiliki 33 kolom:
 
 ```csv
 id,title,description,rich_text_description,availability,condition,price,link,image_link,additional_image_link,brand,gtin,mpn,google_product_category,fb_product_category,product_type,sale_price,sale_price_effective_date,item_group_id,color,size,material,pattern,gender,age_group,inventory,quantity_to_sell_on_facebook,status,custom_label_0,custom_label_1,custom_label_2,custom_label_3,custom_label_4
 ```
 
+Kolom `inventory` masih tercantum karena ada pada file CSV saat ini. Untuk feed baru, gunakan `quantity_to_sell_on_facebook` sebagai field kuantitas yang direkomendasikan Meta. Jangan mengirim dua sumber kuantitas yang saling bertentangan.
+
 ## 2. Requirement levels
 
 | Level | Meaning |
 |---|---|
-| Required | Required for the standard ecommerce product catalog use cases described by Meta. |
-| Conditional | Required only for particular checkout, catalog, or product-category scenarios. |
-| Optional | Documented field that can enrich the product record but is not universally required. |
-| Verify | Present in this repository's schema or a related Meta API model, but confirm CSV-feed acceptance and behavior for the specific catalog before relying on it. |
+| Required | Termasuk dalam daftar required Meta Catalog Fields untuk produk standar. |
+| Conditional | Wajib hanya untuk kategori, checkout, negara, atau channel tertentu. |
+| Optional | Didokumentasikan Meta, tetapi tidak wajib secara universal. |
+| Legacy | Field lama yang sedang digantikan; hindari untuk implementasi feed baru. |
+| Verify | Perlu dikonfirmasi pada metode ingest atau konfigurasi katalog tertentu sebelum digunakan. |
 
-For standard ecommerce products, Meta's published feed guidance lists `id`, `title`, `description`, `availability`, `condition`, `price`, `link`, `image_link`, and at least one of `brand`, `mpn`, or `gtin` as required. Requirements can vary by channel and checkout setup.
+### Required fields
+
+Dokumentasi Meta Catalog Fields saat ini mencantumkan field berikut sebagai required untuk produk standar: `id`, `title`, `description`, `availability`, `condition`, `price`, `link`, `image_link`, dan `brand`.
+
+Ada panduan Meta Data Feed Help Center yang lebih lama yang menyebut brand, MPN, atau GTIN sebagai alternatif identifikasi. Karena sumber dan alur feed dapat berbeda, dokumen ini mengikuti daftar required pada Meta Catalog Fields yang lebih baru: isi `brand`, dan sertakan GTIN/MPN bila tersedia serta valid. Jangan menganggap GTIN atau MPN menggantikan `brand` tanpa konfirmasi pada persyaratan katalog target.
 
 ## 3. Field-by-field reference
 
 ### 3.1 Product identity and content
 
-| Field | Level | Purpose and guidance |
-|---|---|---|
-| `id` | Required | Unique, case-sensitive item/content ID. Prefer a stable SKU. Do not reuse the same ID for multiple variants. For catalog ads, align it with the corresponding Pixel/Conversions API content ID. |
-| `title` | Required | Product name. Use a specific, readable title; Meta's reference gives a 200-character maximum and recommends keeping it shorter to avoid truncation. |
-| `description` | Required | Plain-text product description. Keep it distinct from the title; do not put HTML in this field. Retain it as the fallback even when `rich_text_description` is populated. |
-| `rich_text_description` | Optional | HTML/rich-text product description, maximum 9,999 characters in the catalog feed reference. It is not supported in ads; the plain-text `description` remains required. See [HTML guidance](#4-rich_text_description-html-guidance). |
+| Field | Level | Purpose and guidance | Limit / format |
+|---|---|---|---|
+| `id` | Required | ID item unik dan stabil; idealnya SKU. Setiap varian memiliki ID sendiri. Samakan dengan content ID Pixel/Conversions API bila dipakai untuk pencocokan katalog. | Maks. 100 karakter |
+| `title` | Required | Nama produk yang spesifik dan mudah dibaca. | Maks. 200 karakter; disarankan ≤65 karakter agar tidak terpotong |
+| `description` | Required | Deskripsi plain text, unik, informatif, dan bukan sekadar pengulangan judul. Jangan masukkan HTML. Tetap isi sebagai fallback walaupun rich text tersedia. | Maks. 9.999 karakter |
+| `rich_text_description` | Optional | Deskripsi HTML/rich text. Saat tersedia, dapat dipakai untuk tampilan deskripsi kaya di Shop; plain-text `description` tetap harus ada sebagai fallback. Tidak didukung untuk catalog ads. | Maks. 9.999 karakter |
 
 ### 3.2 Availability, price, and destination
 
-| Field | Level | Purpose and guidance |
-|---|---|---|
-| `availability` | Required | Current stock state. Common feed values include `in stock` and `out of stock`; use only values accepted for the catalog workflow. Keep synchronized with real inventory. |
-| `condition` | Required | Product condition. Common values are `new`, `refurbished`, and `used`. |
-| `price` | Required | Regular item price. Feed format: numeric amount, space, ISO 4217 currency code, e.g. `24999000 IDR`. Do not use currency symbols or localized thousands separators. |
-| `link` | Required | Direct product page URL on the merchant's website, beginning with `https://` or `http://`. It should lead to the exact item/variant represented by the row. |
-| `image_link` | Required | Main product image URL. Use an accessible product image that meets Meta's image specifications; the feed reference specifies JPEG/PNG and minimum image dimensions. |
-| `additional_image_link` | Optional | Additional product image URLs. Up to 20 URLs and 2,000 characters in the feed reference. Supported separators include comma, semicolon, space, and vertical bar (`|`). Quote the complete CSV cell when it contains a list. All image URLs should meet the same image requirements as the main image. |
-| `sale_price` | Optional | Promotional price, formatted like `price`. It should be lower than the regular price. |
-| `sale_price_effective_date` | Optional | Start/end period for the sale, with start and end separated by `/`. Use date-time values with timezone, for example `2026-11-27T00:00+07:00/2026-11-30T23:59+07:00`. |
-| `status` | Optional | Catalog item state: `active` or `archived`. Active items can appear in connected channels; archived items are not shown. |
+| Field | Level | Purpose and guidance | Limit / format |
+|---|---|---|---|
+| `availability` | Required | Status ketersediaan stok. Untuk feed CSV, gunakan nilai `in stock` atau `out of stock` sesuai spesifikasi Catalog Fields. Jangan menyalin seluruh enum dari Product Item API ke CSV. | Enum feed: `in stock`, `out of stock` |
+| `condition` | Required | Kondisi produk. | Feed values: `new`, `refurbished`, `used` |
+| `price` | Required | Harga reguler. Format feed: angka, spasi, kode mata uang ISO 4217, misalnya `24999000 IDR`. Gunakan titik untuk desimal; tanpa simbol mata uang atau pemisah ribuan lokal. | `amount ISO_CURRENCY` |
+| `link` | Required | URL langsung ke halaman produk pada situs merchant. Halaman harus merepresentasikan produk/varian pada baris tersebut. | URL HTTP(S) yang valid |
+| `image_link` | Required | URL gambar utama produk yang dapat diakses publik. | JPEG/PNG; minimum 500 × 500 px; maksimum 8 MB |
+| `additional_image_link` | Optional | URL gambar tambahan produk. Maksimum 20 gambar dan total panjang field 2.000 karakter. | Pisahkan URL dengan koma, titik koma, spasi, atau pipe (`|`); bungkus seluruh daftar dalam satu quoted CSV cell |
+| `sale_price` | Optional | Harga promosi, memakai format yang sama dengan `price`; harus lebih rendah dari harga reguler. | `amount ISO_CURRENCY` |
+| `sale_price_effective_date` | Optional | Rentang waktu promosi dengan timestamp mulai dan selesai dipisahkan `/`. Sertakan timezone, misalnya `2026-11-27T00:00+07:00/2026-11-30T23:59+07:00`. | `start/end` |
+| `status` | Optional | Status item katalog pada feed: `active` atau `archived`. Jangan menyamakan field ini dengan `visibility` pada Product Item API. | Feed values: `active`, `archived` |
+
+Jika URL gambar diganti setelah feed diproses, gunakan URL gambar baru atau pastikan mekanisme refresh katalog mengenali perubahan gambar. Jangan mengandalkan perubahan file pada URL yang sama akan langsung memicu pemrosesan ulang gambar.
 
 ### 3.3 Brand and product identifiers
 
-| Field | Level | Purpose and guidance |
-|---|---|---|
-| `brand` | Required alternative | Brand/manufacturer name. At least one of `brand`, `mpn`, or `gtin` must be provided for standard ecommerce product feeds. |
-| `gtin` | Required alternative | Valid Global Trade Item Number, such as UPC, EAN, JAN, or ISBN where applicable. Do not invent or reuse a GTIN. |
-| `mpn` | Required alternative | Manufacturer Part Number. Use the actual manufacturer-assigned identifier; do not substitute an internal SKU unless it is genuinely the MPN. |
+| Field | Level | Purpose and guidance | Limit / format |
+|---|---|---|---|
+| `brand` | Required | Nama brand/manufacturer. Diisi sesuai daftar required pada Meta Catalog Fields. | Teks |
+| `gtin` | Optional / recommended when available | Global Trade Item Number seperti UPC, EAN, JAN, atau ISBN yang benar-benar ditetapkan untuk produk. Jangan membuat atau memakai ulang GTIN. | Identifier valid |
+| `mpn` | Optional / recommended when available | Manufacturer Part Number yang ditetapkan produsen. Jangan menggantinya dengan SKU internal kecuali SKU tersebut memang MPN produsen. | Identifier valid |
+
+**Catatan perbedaan sumber:** sejumlah panduan feed lama menyebut `brand`, `mpn`, atau `gtin` sebagai alternatif. Meta Catalog Fields yang menjadi acuan field pada dokumen ini mencantumkan `brand` sebagai required dan GTIN/MPN sebagai identifier tambahan. Ikuti validasi Commerce Manager bila instruksi katalog tertentu berbeda.
 
 ### 3.4 Categorization and variants
 
+| Field | Level | Purpose and guidance | Limit / format |
+|---|---|---|---|
+| `google_product_category` | Optional / conditional | Kategori dari Google Product Taxonomy. Meta Catalog Fields mencantumkannya sebagai optional; kebutuhan tambahan dapat bergantung pada checkout/channel atau instruksi katalog tertentu. | Maks. 750 karakter |
+| `fb_product_category` | Optional | Kategori dari taksonomi Meta/Facebook. Gunakan kategori paling spesifik yang sesuai; feed dapat menggunakan nilai kategori yang dikenali, seperti nama atau ID sesuai spesifikasi. | Meta taxonomy |
+| `product_type` | Optional | Jalur kategori buatan merchant, misalnya `Electronics > Phones > Smartphones`. Bukan pengganti taxonomy platform jika taxonomy diwajibkan. | Maks. 750 karakter |
+| `item_group_id` | Optional | ID bersama untuk mengelompokkan varian satu produk induk. Semua varian memakai nilai yang sama, sedangkan `id` tiap varian tetap unik. | Maks. 100 karakter |
+| `color` | Optional / category-dependent | Warna varian; gunakan nilai konsisten dan akurat. | Maks. 200 karakter |
+| `size` | Conditional | Ukuran produk. Dapat diwajibkan untuk kategori tertentu di Shops, khususnya pakaian dan sepatu; bukan persyaratan umum untuk varian kapasitas penyimpanan ponsel. | Maks. 200 karakter |
+| `material` | Optional / category-dependent | Material atau komposisi produk bila relevan. | Maks. 200 karakter |
+| `pattern` | Optional / category-dependent | Motif/pola produk bila relevan. | Maks. 100 karakter |
+| `gender` | Optional / category-dependent | Target gender bila relevan dengan kategori produk. Gunakan nilai taxonomy yang sesuai. | Nilai taxonomy |
+| `age_group` | Optional / category-dependent | Kelompok usia bila relevan. Gunakan nilai taxonomy yang sesuai, misalnya `adult`, `kids`, atau `infant`. | Nilai taxonomy |
+
+### 3.5 Inventory and checkout
+
 | Field | Level | Purpose and guidance |
 |---|---|---|
-| `google_product_category` | Conditional / optional | Google product taxonomy category. Meta feed guidance identifies it as additionally required for certain checkout/channel configurations. Use a valid taxonomy value when applicable. |
-| `fb_product_category` | Optional | Meta/Facebook product taxonomy category. Choose the most specific applicable category from Meta's taxonomy. |
-| `product_type` | Optional | Merchant-defined category path, useful for internal product categorization. It is not a substitute for a required platform taxonomy field when one is required. |
-| `item_group_id` | Optional | Shared identifier connecting variants of one parent product. Use the same value for all variants in a group, and keep it distinct from each variant's `id`. |
-| `color` | Optional / category-dependent | Variant color. Use a concise, consistent value for each variant. |
-| `size` | Conditional | Product size. Required for certain product categories in Shops, notably clothing and shoes; not generally required for a phone storage variant. |
-| `material` | Optional / category-dependent | Material composition or finish, when relevant and accurate. |
-| `pattern` | Optional / category-dependent | Product pattern, when applicable. |
-| `gender` | Optional / category-dependent | Intended gender audience. Common values include `female`, `male`, and `unisex`; only populate when relevant to the product. |
-| `age_group` | Optional / category-dependent | Intended age group. Common taxonomy values include `adult`, `all ages`, `infant`, `kids`, `newborn`, `teen`, and `toddler`; choose only when meaningful for the product. |
+| `quantity_to_sell_on_facebook` | Optional / checkout-dependent | Field kuantitas yang direkomendasikan Meta untuk jumlah yang tersedia dijual di Facebook. Gunakan untuk integrasi feed baru bila sesuai dengan channel/checkout katalog. Pastikan nilainya sinkron dengan stok aktual. |
+| `inventory` | Legacy | Meta menyatakan `inventory` digantikan oleh `quantity_to_sell_on_facebook`. Nama lama masih dapat didukung selama masa transisi, tetapi jangan gunakan untuk implementasi baru. Hapus dari skema feed baru setelah kompatibilitas dan migrasi katalog dipastikan. |
 
-### 3.5 Inventory, checkout, and custom labels
+Jangan mengirim nilai stok berbeda pada `inventory` dan `quantity_to_sell_on_facebook`. Untuk katalog lama, periksa aturan migrasi dan hasil diagnostik sebelum menghapus field legacy.
 
-| Field | Level | Purpose and guidance |
-|---|---|---|
-| `inventory` | Conditional | Inventory information required for some Facebook/Instagram checkout and Page Shop configurations. The exact expected representation depends on the catalog/checkout workflow. Do not leave it blank when the selected workflow requires it. |
-| `quantity_to_sell_on_facebook` | Verify / workflow-dependent | Quantity offered for sale on Facebook in the Product Item model. Confirm that the chosen CSV feed ingestion path accepts this attribute and check its checkout-specific behavior before relying on it. |
-| `custom_label_0` | Optional | Custom text label for organizing/filtering products or use in ad creative. Maximum 100 characters in the product field reference. |
-| `custom_label_1` | Optional | Second custom text label; same purpose and constraints as `custom_label_0`. |
-| `custom_label_2` | Optional | Third custom text label; same purpose and constraints as `custom_label_0`. |
-| `custom_label_3` | Optional | Fourth custom text label; same purpose and constraints as `custom_label_0`. |
-| `custom_label_4` | Optional | Fifth custom text label; same purpose and constraints as `custom_label_0`. |
+### 3.6 Custom labels
 
-Custom labels are five separate scalar fields, not a semicolon- or pipe-separated list. Example values such as `flash_sale`, `discount`, or `black_friday` are merchant-defined classifications; they do not independently create or activate a Meta promotion.
+| Field | Level | Purpose and guidance | Limit |
+|---|---|---|---|
+| `custom_label_0` | Optional | Label teks merchant untuk segmentasi/organisasi item. | Maks. 100 karakter |
+| `custom_label_1` | Optional | Label teks merchant kedua. | Maks. 100 karakter |
+| `custom_label_2` | Optional | Label teks merchant ketiga. | Maks. 100 karakter |
+| `custom_label_3` | Optional | Label teks merchant keempat. | Maks. 100 karakter |
+| `custom_label_4` | Optional | Label teks merchant kelima. | Maks. 100 karakter |
+
+Custom labels adalah lima field scalar terpisah, bukan daftar yang dipisahkan titik koma atau pipe. Contoh `flash_sale`, `discount`, dan `black_friday` hanyalah klasifikasi internal merchant; label tidak membuat atau mengaktifkan promosi Meta. Meta juga mendokumentasikan `internal_label` untuk pengelompokan/filter product set; pertimbangkan field tersebut jika workflow mendukungnya.
 
 ## 4. `rich_text_description` HTML guidance
 
-Meta's feed reference lists these supported HTML tags:
+Meta Catalog Fields mencantumkan tag HTML berikut sebagai tag yang didukung untuk rich text:
 
 - Structure/content: `<form>`, `<fieldset>`, `<div>`, `<span>`, `<section>`, `<header>`
-- Headings: `<h1>` through `<h6>`
+- Headings: `<h1>` sampai `<h6>`
 - Tables: `<table>`, `<tbody>`, `<tfoot>`, `<thead>`, `<td>`, `<th>`, `<tr>`
 - Lists: `<ul>`, `<li>`, `<ol>`, `<dl>`, `<dd>`, `<dt>`
 - Formatting: `<b>`, `<u>`, `<i>`, `<em>`, `<strong>`, `<title>`, `<small>`, `<br>`, `<p>`, `<sub>`, `<sup>`, `<pre>`, `<q>`, `<s>`
 
-Meta may strip HTML attributes such as inline styling. Do not assume that arbitrary HTML, CSS, JavaScript, embeds, or interactive elements are supported. Keep markup semantic and simple, and validate the rendered result in the target Shop.
+Daftar ini adalah allow-list rujukan Meta, bukan jaminan bahwa setiap kombinasi tag tampil identik di semua placement. Meta dapat menghapus atribut HTML seperti styling. Jangan mengandalkan CSS, JavaScript, embed, event handler, atau elemen interaktif. Tag `<html>` yang tampak pada contoh wrapper dokumentasi bukan bagian dari allow-list eksplisit; `<body>` juga tidak tercantum. Karena itu, hindari wrapper tersebut dan kirim fragmen HTML sederhana.
 
-Recommended product-description subset:
+Contoh fragmen yang disarankan:
 
 ```html
-<html>
-  <h2>Product Name</h2>
-  <p>Short product description.</p>
+<h2>Product Name</h2>
+<p>Short product description.</p>
 
-  <h3>Product Details</h3>
-  <ul>
-    <li><strong>Brand:</strong> Example Brand</li>
-    <li><strong>Model:</strong> Example Model</li>
-    <li><strong>Color:</strong> Black</li>
-  </ul>
+<h3>Product Details</h3>
+<ul>
+  <li><strong>Brand:</strong> Example Brand</li>
+  <li><strong>Model:</strong> Example Model</li>
+  <li><strong>Color:</strong> Black</li>
+</ul>
 
-  <h3>Features</h3>
-  <ul>
-    <li>Feature one</li>
-    <li>Feature two</li>
-  </ul>
+<h3>Features</h3>
+<ul>
+  <li>Feature one</li>
+  <li>Feature two</li>
+</ul>
 
-  <h3>Specifications</h3>
-  <table>
-    <tbody>
-      <tr><th>Storage</th><td>256GB</td></tr>
-      <tr><th>Condition</th><td>New</td></tr>
-    </tbody>
-  </table>
-</html>
+<h3>Specifications</h3>
+<table>
+  <tbody>
+    <tr><th>Storage</th><td>256GB</td></tr>
+    <tr><th>Condition</th><td>New</td></tr>
+  </tbody>
+</table>
 ```
 
-The tag list above is a documented allow-list reference, not a guarantee that every combination renders identically in every placement. Rich text is not used for catalog ads.
+Rich text tidak didukung untuk catalog ads. Selalu isi `description` plain text sebagai fallback.
 
 ## 5. CSV formatting rules
 
-1. The first row contains exact field names in US English.
-2. Each following row represents one catalog item/variant.
-3. Use commas as the CSV column delimiter.
-4. Quote a field with double quotes when it contains commas, line breaks, or quote characters.
-5. Escape a quote inside a quoted CSV value by doubling it: `""`.
-6. For `additional_image_link`, separators inside the value may be comma, semicolon, space, or pipe. The complete value must remain one quoted CSV cell when necessary.
-7. For `sale_price_effective_date`, separate the start and end timestamps with `/`; this is not a list separator.
-8. Keep currency values in the format `amount ISO_CURRENCY`, for example `24999000 IDR`.
-9. Keep identifiers stable and unique. Each variant gets its own `id`; variants share `item_group_id`.
-10. Do not insert HTML into `description`; reserve HTML for `rich_text_description`.
+1. Baris pertama harus berisi nama field persis seperti header schema; gunakan nama field bahasa Inggris.
+2. Setiap baris berikutnya merepresentasikan satu item/varian katalog.
+3. Gunakan koma sebagai delimiter kolom CSV.
+4. Bungkus field dengan tanda kutip ganda jika berisi koma, line break, atau karakter kutip.
+5. Escape tanda kutip di dalam quoted value dengan menggandakannya: `""`.
+6. Untuk `additional_image_link`, separator daftar URL yang didokumentasikan adalah koma, titik koma, spasi, atau pipe (`|`). Bungkus seluruh daftar sebagai satu quoted CSV cell agar delimiter tidak memecah kolom.
+7. Untuk `sale_price_effective_date`, pisahkan timestamp awal dan akhir dengan `/`; ini bukan separator daftar URL.
+8. Format harga adalah `amount ISO_CURRENCY`, misalnya `24999000 IDR`; gunakan titik sebagai pemisah desimal.
+9. ID tiap varian harus unik dan stabil. Varian satu produk berbagi `item_group_id`.
+10. Jangan memasukkan HTML ke `description`; gunakan `rich_text_description` untuk markup yang didukung.
+11. Jangan mengirim `inventory` dan `quantity_to_sell_on_facebook` dengan nilai stok yang bertentangan.
 
-## 6. Validation checklist
+Contoh satu cell untuk beberapa gambar:
 
-- [ ] All required fields are populated for the intended catalog channel.
-- [ ] At least one of `brand`, `gtin`, or `mpn` is present and genuine.
-- [ ] Every `id` is unique and stable.
-- [ ] Variant rows share the correct `item_group_id`.
-- [ ] `price` and `sale_price` use valid currency formatting.
-- [ ] `sale_price` is lower than `price` and its effective dates are valid.
-- [ ] Product and image URLs are publicly accessible and point to the correct variant.
-- [ ] Additional image URLs are correctly quoted and within documented limits.
-- [ ] `availability` and inventory data reflect actual stock.
-- [ ] Category fields match the product and intended catalog.
-- [ ] Custom labels contain one value each and are not treated as promotions.
-- [ ] CSV parses to the same number of columns on every row.
-- [ ] The feed is uploaded/tested in Commerce Manager and item diagnostics are reviewed.
+```csv
+" https://example.com/black-front.jpg|https://example.com/black-back.jpg|https://example.com/black-side.jpg "
+```
 
-## 7. Important status of this repository's sample data
+Hapus spasi awal/akhir pada nilai sebenarnya; contoh di atas hanya menonjolkan bahwa keseluruhan daftar berada dalam satu quoted cell.
 
-The current `meta-product-feed.csv` is a demonstration file. It contains placeholder `example.com` links, sample prices/quantities, and fictional iPhone 18 Pro Max variant examples. Do not use it as a production feed until real product specifications, GTIN/MPN values, product URLs, image URLs, prices, stock, and sale dates have been supplied and validated.
+## 6. CSV feed vs Product Item API
 
-## 8. References
+Nama field dan format pada CSV feed tidak selalu sama dengan parameter Product Item API. Tabel ini adalah peta nama/konsep, bukan instruksi untuk mengirim nama API ke CSV.
 
-- Meta Business Help Center — [Data Feed Specifications for Catalogs](https://www.facebook.com/business/help/120325381656392)
-- Meta Developers — [Product Item reference](https://developers.facebook.com/docs/marketing-api/reference/product-item/)
-- Meta Developers — [Marketplace Partner Item API](https://developers.facebook.com/docs/marketplace/partnerships/itemAPI/)
-- Meta Developers — [Feed API Reference](https://developers.facebook.com/documentation/ads-commerce/catalog/guides/feed-api)
+| CSV feed field | Product Item API field / concept | Important difference |
+|---|---|---|
+| `id` | `retailer_id` | API memakai nama parameter berbeda untuk retailer item ID. |
+| `title` | `name` | Nama produk pada API. |
+| `link` | `url` | URL produk pada API. |
+| `image_link` | `image_url` | URL gambar utama pada API. |
+| `additional_image_link` | `additional_image_urls` | API merepresentasikan gambar tambahan sebagai field berbeda; jangan salin serialisasi CSV secara otomatis. |
+| `google_product_category` | `category` | API category field tidak berarti format taksonomi CSV identik untuk semua alur. |
+| `item_group_id` | `retailer_product_group_id` | Konsep grouping varian; nama API berbeda. |
+| `sale_price_effective_date` | `sale_price_start_date` + `sale_price_end_date` | CSV memakai satu rentang start/end; API memisahkan dua field. |
+| `status` | `visibility` | Tidak setara langsung: feed `active/archived`, API visibility menggunakan konsep seperti `staging/published`. |
+| `availability` | API `availability` | API memiliki enum lebih luas; jangan menganggap semua enum API diterima pada CSV. |
+| `price` | API `price` | CSV memakai string `amount ISO_CURRENCY`; parameter API dapat memakai integer dalam unit minor (misalnya cents) sesuai kontrak API. |
 
-**Documentation note:** Meta changes catalog fields and requirements over time. Re-check the current official specification and the requirements shown for the target catalog/channel before treating this document as a production contract.
+**Aturan:** implementasi CSV harus mengikuti spesifikasi feed CSV. Implementasi API harus mengikuti versi Product Item API yang benar-benar digunakan, termasuk tipe data, enum, dan unit harga. Jangan mencampur field names atau format dari kedua interface.
+
+## 7. Optional Meta catalog attributes not in this CSV
+
+Meta mendokumentasikan atribut katalog tambahan yang belum termasuk dalam 33 kolom repository ini. Daftar berikut bukan rekomendasi untuk menambahkan semuanya; pilih hanya bila ada kebutuhan dan ingestion path mendukungnya.
+
+| Attribute | Typical purpose | Notes |
+|---|---|---|
+| `shipping` | Informasi ongkos/layanan pengiriman | Struktur dan format bergantung pada spesifikasi feed/channel. |
+| `shipping_weight` | Berat pengiriman | Isi dengan unit dan format yang diterima feed. |
+| `internal_label` | Label internal untuk product set/filtering | Meta menyarankan mempertimbangkannya untuk pengelompokan produk. |
+| `custom_number_0`–`custom_number_4` | Nilai numerik custom | Field tambahan; verifikasi dukungan feed. |
+| `expiration_date` | Tanggal kedaluwarsa | Relevan untuk produk yang memiliki tanggal kedaluwarsa. |
+| `mobile_link` | URL landing page mobile | Opsional jika URL mobile terpisah. |
+| `video[0].url`–`video[19].url` | Video produk | Gunakan struktur yang diterima feed, bukan format API yang diasumsikan. |
+| `additional_variant_attribute` | Atribut varian tambahan | Gunakan hanya jika struktur varian katalog membutuhkannya. |
+
+Sebelum memperluas schema CSV, cek apakah atribut tersedia pada metode feed yang dipakai dan apakah katalog target menerima formatnya. Field yang ada pada dokumentasi API tidak otomatis dapat dipakai dengan nama/format identik pada CSV.
+
+## 8. Validation checklist
+
+- [ ] Semua required fields Meta Catalog Fields terisi.
+- [ ] `brand` tersedia; GTIN/MPN ditambahkan bila tersedia dan valid.
+- [ ] Setiap `id` unik, stabil, dan maksimum 100 karakter.
+- [ ] Panjang `title`, `description`, `item_group_id`, dan atribut lain sesuai batas pada tabel.
+- [ ] `availability` menggunakan nilai feed `in stock` atau `out of stock`.
+- [ ] `condition` menggunakan nilai feed yang diterima: `new`, `refurbished`, atau `used`.
+- [ ] `price` dan `sale_price` menggunakan format mata uang yang benar.
+- [ ] `sale_price` lebih rendah dari `price`; tanggal promosi dan timezone valid.
+- [ ] URL produk dan gambar dapat diakses publik serta sesuai dengan varian.
+- [ ] Gambar utama JPEG/PNG, minimal 500 × 500 px, dan maksimum 8 MB.
+- [ ] Daftar gambar tambahan tidak lebih dari 20 URL/2.000 karakter dan berada dalam satu quoted CSV cell.
+- [ ] Kuantitas Facebook sinkron dengan stok; field baru `quantity_to_sell_on_facebook` digunakan bila workflow mendukungnya.
+- [ ] Field legacy `inventory` tidak menjadi sumber stok yang bertentangan.
+- [ ] Taxonomy kategori sesuai produk dan ketentuan katalog/channel.
+- [ ] `size` diisi untuk kategori yang mewajibkannya.
+- [ ] Custom labels masing-masing berisi satu nilai dan tidak dianggap sebagai promosi.
+- [ ] CSV dapat diparse dengan jumlah kolom yang konsisten pada setiap baris.
+- [ ] Feed diuji melalui Commerce Manager dan seluruh item diagnostics ditinjau.
+
+## 9. Sample data status
+
+File `meta-product-feed.csv` di repository adalah file demonstrasi, bukan feed produksi. File berisi URL placeholder `example.com`, harga/kuantitas contoh, dan contoh varian iPhone 18 Pro Max fiktif. Jangan gunakan sebagai feed produksi sebelum spesifikasi produk, brand, GTIN/MPN, URL produk, URL gambar, harga, stok, serta tanggal promosi nyata diberikan dan divalidasi.
+
+## 10. Official references
+
+1. Meta Developers — [Catalog Fields](https://developers.facebook.com/documentation/ads-commerce/commerce-platform/catalog/fields) — acuan utama required/optional fields, batas field, image requirements, rich text, dan atribut katalog.
+2. Meta Developers — [Inventory](https://developers.facebook.com/documentation/ads-commerce/commerce-platform/catalog/inventory) — menyatakan `inventory` digantikan oleh `quantity_to_sell_on_facebook`; halaman ini mencatat pembaruan 3 Maret 2026.
+3. Meta Developers — [Product Item API reference](https://developers.facebook.com/docs/marketing-api/reference/product-item/) — acuan khusus API; field names, enum, dan tipe data API tidak boleh diasumsikan identik dengan CSV.
+4. Meta Business Help Center — [Data Feed Specifications for Catalogs](https://www.facebook.com/business/help/120325381656392) — panduan feed dan checkout; beberapa instruksi lama dapat berbeda dari Catalog Fields terbaru.
+5. Meta Developers — [Marketplace Partner Item API](https://developers.facebook.com/docs/marketplace/partnerships/itemAPI/) — spesifikasi khusus partner Marketplace, bukan pengganti spesifikasi umum CSV katalog.
+6. Meta Developers — [Feed API Reference](https://developers.facebook.com/documentation/ads-commerce/catalog/guides/feed-api) — dokumentasi Feed API; gunakan hanya untuk interface tersebut.
+
+**Documentation note:** Meta dapat mengubah field, batas, dan persyaratan. Sebelum rilis produksi, periksa ulang dokumentasi resmi dan instruksi/diagnostik Commerce Manager untuk katalog, negara, checkout, dan channel yang digunakan.

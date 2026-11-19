@@ -91,6 +91,8 @@ Jika URL gambar diganti setelah feed diproses, gunakan URL gambar baru atau past
 | `quantity_to_sell_on_facebook` | Optional / checkout-dependent | Field kuantitas yang direkomendasikan Meta untuk jumlah yang tersedia dijual di Facebook. Gunakan untuk integrasi feed baru bila sesuai dengan channel/checkout katalog. Pastikan nilainya sinkron dengan stok aktual. |
 | `inventory` | Legacy | Meta menyatakan `inventory` digantikan oleh `quantity_to_sell_on_facebook`. Nama lama masih dapat didukung selama masa transisi, tetapi jangan gunakan untuk implementasi baru. Hapus dari skema feed baru setelah kompatibilitas dan migrasi katalog dipastikan. |
 
+**Kebijakan schema repository:** kolom `inventory` dipertahankan pada header 33 kolom untuk kompatibilitas, tetapi wajib kosong di semua baris; validator menolak nilai non-empty. Kolom ini tidak boleh menjadi sumber stok baru. `quantity_to_sell_on_facebook` adalah satu-satunya kolom kuantitas yang digunakan; jika diisi, nilainya bilangan bulat non-negatif. Jangan hapus kolom legacy sebelum konsumen feed lama dimigrasikan dan perubahan schema disetujui.
+
 Jangan mengirim nilai stok berbeda pada `inventory` dan `quantity_to_sell_on_facebook`. Untuk katalog lama, periksa aturan migrasi dan hasil diagnostik sebelum menghapus field legacy.
 
 ### 3.6 Custom labels
@@ -229,7 +231,7 @@ Sebelum memperluas schema CSV, cek apakah atribut tersedia pada metode feed yang
 
 ## 9. Sample data status
 
-File `meta-product-feed.csv` di repository adalah file demonstrasi, bukan feed produksi. File berisi URL placeholder `example.com`, harga/kuantitas contoh, dan contoh varian iPhone 18 Pro Max fiktif. Jangan gunakan sebagai feed produksi sebelum spesifikasi produk, brand, GTIN/MPN, URL produk, URL gambar, harga, stok, serta tanggal promosi nyata diberikan dan divalidasi.
+File `meta-product-feed.csv` di repository adalah file demonstrasi, bukan feed produksi. Validator default memeriksa schema dan konsistensi data demo; gunakan opsi `--production` untuk menolak URL placeholder dan penanda sample sebelum rilis produksi. File berisi URL placeholder `example.com`, harga/kuantitas contoh, dan contoh varian iPhone 18 Pro Max fiktif. Jangan gunakan sebagai feed produksi sebelum spesifikasi produk, brand, GTIN/MPN, URL produk, URL gambar, harga, stok, serta tanggal promosi nyata diberikan dan divalidasi.
 
 ## 10. Official references
 

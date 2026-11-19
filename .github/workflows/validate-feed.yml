@@ -1,0 +1,23 @@
+name: Validate Meta Product Feed
+
+on:
+  push:
+    branches: [main]
+    paths: ["meta-product-feed.csv", "scripts/validate-feed.py", ".github/workflows/validate-feed.yml"]
+  pull_request:
+    paths: ["meta-product-feed.csv", "scripts/validate-feed.py", ".github/workflows/validate-feed.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-feed:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Validate Meta product feed
+        run: python scripts/validate-feed.py
